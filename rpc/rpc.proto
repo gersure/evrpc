@@ -1,0 +1,40 @@
+syntax = "proto2";
+
+package evrpc;
+
+option go_package = "ekvrpc";
+option java_package = "ekvrpc";
+option java_outer_classname = "RpcProto";
+
+enum MessageType
+{
+  UNKNOW = 0;
+  REQUEST = 1;
+  RESPONSE = 2;
+  ERROR = 3; // not used
+}
+
+enum ErrorCode
+{
+  NO_ERROR = 0;
+  WRONG_PROTO = 1;
+  NO_SERVICE = 2;
+  NO_METHOD = 3;
+  INVALID_REQUEST = 4;
+  INVALID_RESPONSE = 5;
+  TIMEOUT = 6;
+}
+
+message RpcMessage
+{
+  optional MessageType type= 1;
+  optional fixed64 id = 2;
+
+  optional string service = 3;
+  optional string method = 4;
+  optional bytes request = 5;
+
+  optional bytes response = 6;
+
+  optional ErrorCode error = 7;
+}
