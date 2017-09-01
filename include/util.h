@@ -2,6 +2,7 @@
 #define _UTIL_H
 
 #include <memory>
+#include <glog/logging.h>
 
 class noncopyable
 {

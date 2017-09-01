@@ -10,7 +10,7 @@ RpcChannel::RpcChannel()
   : codec_(std::bind(&RpcChannel::onRpcMessage, this, std::placeholders::_1,std::placeholders::_2)),
     services_(NULL)
 {
-  std::cout << "RpcChannel::init -- " << this;
+  LOG(INFO) << "RpcChannel::Constructor -- " << this;
 }
 
 RpcChannel::RpcChannel(Conn* conn)
@@ -18,12 +18,12 @@ RpcChannel::RpcChannel(Conn* conn)
     conn_(conn),
     services_(NULL)
 {
-  std::cout << "RpcChannel::init -- " << this;
+  LOG(INFO) << "RpcChannel::Constructor -- " << this;
 }
 
 RpcChannel::~RpcChannel()
 {
-  std::cout << "RpcChannel::dtor - " << this;
+  LOG(INFO) << "RpcChannel::Destructor - " << this;
   for (std::map<int64_t, OutstandingCall>::iterator it = outstandings_.begin(); it != outstandings_.end(); ++it)
   {
     OutstandingCall out = it->second;

@@ -4,10 +4,12 @@
 #include "rpccodec.h"
 #include "tcpclient.h"
 
+#include <glog/logging.h>
 #include <stdio.h>
 #include <unistd.h>
 
 using namespace evrpc;
+using namespace std;
 
 class RpcClient : noncopyable
 {
@@ -44,7 +46,7 @@ class RpcClient : noncopyable
 
     void solved(evrpc::PutResult* resp)
     {
-      LOG(INFO) << "solved:\n" << resp->DebugString().c_str();
+      cout << "solved:\n" << resp->DebugString().c_str();
       client_.quit(NULL);
     }
 
@@ -55,7 +57,7 @@ class RpcClient : noncopyable
 
 int main(int argc, char* argv[])
 {
-  LOG(INFO) << "pid = " << getpid();
+  cout << "pid = " << getpid();
   if (argc > 1)
   {
     RpcClient rpcClient("127.0.0.1", 8009);

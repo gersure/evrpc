@@ -2,6 +2,7 @@
 #include "rpcserver.h"
 #include <iostream>
 #include <unistd.h>
+#include <glog/logging.h>
 
 using namespace evrpc;
 using namespace std;

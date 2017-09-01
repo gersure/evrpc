@@ -31,7 +31,7 @@ void RpcServer::start()
 
 void RpcServer::onConnection(Conn* conn)
 {
-  std::cout<<"Socketfd:"<<conn->getFd()<<"\tthreadid:"<<conn->getThread()->thread_id<<std::endl;
+  LOG(INFO)<<"Socketfd:"<<conn->getFd()<<"\tthreadid:"<<conn->getThread()->thread_id<<std::endl;
 
   RpcChannelPtr channel(new RpcChannel(conn));
   channel->setServices(&services_);
