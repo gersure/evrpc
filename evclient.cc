@@ -1,7 +1,5 @@
 #include "evrpc.pb.h"
 #include "rpcchannel.h"
-#include "codeclite.h"
-#include "rpccodec.h"
 #include "tcpclient.h"
 
 #include <glog/logging.h>
@@ -57,16 +55,10 @@ class RpcClient : noncopyable
 
 int main(int argc, char* argv[])
 {
-  cout << "pid = " << getpid();
-  if (argc > 1)
-  {
+
     RpcClient rpcClient("127.0.0.1", 8009);
     rpcClient.connect();
-  }
-  else
-  {
-    printf("Usage: %s host_ip\n", argv[0]);
-  }
+
   google::protobuf::ShutdownProtobufLibrary();
 }
 

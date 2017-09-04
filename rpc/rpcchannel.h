@@ -2,7 +2,6 @@
 #define RPC_RPCCHANNEL_H
 
 #include "rpccodec.h"
-#include "codeclite.h"
 #include "atomic.h"
 
 #include <google/protobuf/service.h>

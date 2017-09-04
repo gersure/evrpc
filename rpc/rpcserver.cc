@@ -12,8 +12,7 @@ RpcServer::RpcServer(int threads,
                      const std::string& ip, int port)
   : server_(threads, ip, port)
 {
-  server_.setReadCallback(
-      std::bind(&RpcServer::onConnection, this, std::placeholders::_1));
+  server_.setConnectionCallback(std::bind(&RpcServer::onConnection, this, std::placeholders::_1));
 //   server_.setMessageCallback(
 //       std::bind(&RpcServer::onMessage, this, _1, _2, _3));
 }
@@ -36,7 +35,7 @@ void RpcServer::onConnection(Conn* conn)
   RpcChannelPtr channel(new RpcChannel(conn));
   channel->setServices(&services_);
   server_.setReadCallback(std::bind(&RpcChannel::onMessage, get_pointer(channel), std::placeholders::_1));
-
+  conn->setContext(channel);
 }
 
 // void RpcServer::onMessage(const Conn* conn)

@@ -10,10 +10,11 @@ TcpClient::TcpClient(const std::string& ip,int port)
 {
   main_base_.thread_id = pthread_self();
   conn_.thread_ = &main_base_;
-  main_base_.base = event_base_new();
   main_base_.tcp_client = this;
+  main_base_.base = event_base_new();
   if (!main_base_.base)
-    throw EkvNetErr("main thread event_base_new error!");
+    throw EkvNetErr(std::string("Client event_base_new error:").append(
+                      evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())));
 
   LOG(INFO) << "TcpClient init success";
 }
@@ -22,7 +23,7 @@ TcpClient::~TcpClient()
 {
   quit(NULL);
   event_base_free(main_base_.base);
-  LOG(INFO)<< "TcpServer dtor";
+  LOG(INFO)<< "TcpClient dtor";
 }
 
 void TcpClient::bufferReadCb(struct bufferevent* bev,void* data)
@@ -47,6 +48,8 @@ void TcpClient::bufferWriteCb(struct bufferevent* bev,void* data)
 }
 void TcpClient::bufferEventCb(struct bufferevent* bev,short events,void* data)
 {
+  Conn *conn = (Conn*)data;
+
   if (events & BEV_EVENT_EOF){
     LOG(INFO) <<"Connected closed."<<events;
   }else if (events & BEV_EVENT_READING){
@@ -59,22 +62,23 @@ void TcpClient::bufferEventCb(struct bufferevent* bev,short events,void* data)
     LOG(INFO) <<"error when operator."<<events;
   }else if (events & BEV_EVENT_CONNECTED){
     LOG(INFO) <<"connected success."<<events;
-    Conn *conn = (Conn*)data;
     conn->fd_ = bufferevent_getfd(bev);
     conn->readBuf_ = bufferevent_get_input(bev);
     conn->writeBuf_ = bufferevent_get_output(bev);
 
-    if(conn->getThread()->tcp_client->event_cb_)
+    if(conn->getThread()->tcp_client->connect_cb_)
       conn->getThread()->tcp_client->connect_cb_(conn);
     return;
-  }else if (EVUTIL_SOCKET_ERROR() == 115){
-    LOG(INFO) <<"info::::::is not connected."<<events;
-    return;
+//  }else if (EVUTIL_SOCKET_ERROR() == 115){
+//    LOG(INFO) <<"info::::::is not connected."<<events;
+//    return;
   }else{
     LOG(INFO) <<"some unknow error!" << events;
   }
 
   LOG(ERROR) <<EVUTIL_SOCKET_ERROR()<< "\t" << evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR());
+  if(conn->getThread()->tcp_client->event_cb_)
+    conn->getThread()->tcp_client->event_cb_(conn, events);
 
   bufferevent_free(bev);
 }
@@ -92,7 +96,10 @@ void TcpClient::startRun()
   }
   errno = 0;
   conn_.bev_ = bufferevent_socket_new(this->main_base_.base, -1, BEV_OPT_CLOSE_ON_FREE);
-  if (!conn_.bev_){ /*change*/}
+  if (!conn_.bev_){
+    throw EkvNetErr(std::string("New bufferevent socket error:").append(
+                      evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())));
+  }
 
   bufferevent_setcb(conn_.bev_,bufferReadCb,bufferWriteCb,bufferEventCb, &conn_);
   bufferevent_enable(conn_.bev_, EV_WRITE|EV_READ);
@@ -100,7 +107,8 @@ void TcpClient::startRun()
   if ((bufferevent_socket_connect(conn_.bev_, (struct sockaddr *)(&sin), sizeof(sin))) < 0)
   {
     bufferevent_free(conn_.bev_);
-    LOG(ERROR) << "connect to " << ip_ << "error !";
+    LOG(ERROR) << "connect to " << ip_ << "error :\n\t"
+               <<evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR());
     return;
   }
 
@@ -108,7 +116,7 @@ void TcpClient::startRun()
 //  conn_->writeBuf_ = bufferevent_get_output(conn_.bev_);
   event_base_dispatch(main_base_.base);
 
-  printf("Finished\n");
+//  printf("Finished\n");
 }
 
 void TcpClient::quit(timeval *tv)

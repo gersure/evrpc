@@ -1,5 +1,5 @@
-#ifndef RPC_CODEC_LITE_H__
-#define RPC_CODEC_LITE_H__
+#ifndef RPC_CODEC_LITE_H
+#define RPC_CODEC_LITE_H
 
 
 #include <memory>
@@ -55,17 +55,18 @@ class ProtobufCodecLite : noncopyable
   typedef std::function<void (Conn*, ErrorCode)> ErrorCallback;
 
   ProtobufCodecLite(const ::google::protobuf::Message* prototype,
-                    std::string tagArg,
+                    const char * tagArg,
                     const ProtobufMessageCallback& messageCb,
                     const RawMessageCallback& rawCb = RawMessageCallback(),
                     const ErrorCallback& errorCb = defaultErrorCallback)
     : prototype_(prototype),
-      tag_(tagArg),
+      tag_(tagArg, strlen(tagArg)),
       messageCallback_(messageCb),
       rawCb_(rawCb),
       errorCallback_(errorCb),
-      kMinMessageLen(tagArg.size() + kChecksumLen)
+      kMinMessageLen(tag_.length() + kChecksumLen)
   {
+    LOG(INFO) << "ProtobufCodecLite Constructor" ;
   }
 
   virtual ~ProtobufCodecLite() { }
@@ -86,7 +87,7 @@ class ProtobufCodecLite : noncopyable
 
   // public for unit tests
   ErrorCode parse(Conn* conn, int len, ::google::protobuf::Message* message);
-  void fillEmptyBuffer(struct evbuffer* buf, const google::protobuf::Message& message);
+  int fillEmptyBuffer(struct evbuffer* buf, const google::protobuf::Message& message);
 
 
 
@@ -102,10 +103,10 @@ class ProtobufCodecLite : noncopyable
   ProtobufMessageCallback messageCallback_;
   RawMessageCallback rawCb_;
   ErrorCallback errorCallback_;
-  const int kMinMessageLen;
+  const uint32_t kMinMessageLen;
 };
 
-template<typename MSG, const char* TAG, typename CODEC=ProtobufCodecLite>  // TAG must be a variable with external linkage, not a string literal
+template<typename MSG, const char *TAG, typename CODEC=ProtobufCodecLite>  // TAG must be a variable with external linkage, not a string literal
 class ProtobufCodecLiteT
 {
   static_assert(std::is_base_of<ProtobufCodecLite, CODEC>::value, "CODEC should be derived from ProtobufCodecLite");
@@ -119,11 +120,9 @@ class ProtobufCodecLiteT
                               const RawMessageCallback& rawCb = RawMessageCallback(),
                               const ErrorCallback& errorCb = ProtobufCodecLite::defaultErrorCallback)
     : messageCallback_(messageCb),
-      codec_(&MSG::default_instance(),
-             TAG,
+      codec_(&MSG::default_instance(), TAG,
              std::bind(&ProtobufCodecLiteT::onRpcMessage, this, std::placeholders::_1,std::placeholders::_2),
-             rawCb,
-             errorCb)
+             rawCb, errorCb)
   {
   }
 

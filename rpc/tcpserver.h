@@ -1,5 +1,5 @@
-#ifndef _EKV_SERVER_H
-#define _EKV_SERVER_H
+#ifndef RPC_SERVER_H
+#define RPC_SERVER_H
 
 
 #include <stdlib.h>
@@ -68,8 +68,13 @@ public:
     int addToWriteBuffer(char *buffer, int len) { LOG(INFO)<<"add write buffer"; return evbuffer_add(writeBuf_, buffer, len); }
     int addBufToWriteBuffer(evbuffer *buf) { return evbuffer_add_buffer(writeBuf_, buf); }
     void moveBufferReadToWrite() { evbuffer_add_buffer(writeBuf_, readBuf_); }
+    void setContext(const Any& context) { context_ = context; }
+    const Any& getContext() const { return context_; }
+    Any* getMutableContext() { return &context_; }
+
 private:
     int fd_;
+    Any  context_;
     LibeventThread* thread_;
     bufferevent *bev_;
     evbuffer *readBuf_;

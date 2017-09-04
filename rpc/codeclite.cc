@@ -28,25 +28,37 @@ namespace evrpc
 void ProtobufCodecLite::send(Conn* conn,
                              const ::google::protobuf::Message& message)
 {
+//  int res = 0;
   struct evbuffer *ebuf = evbuffer_new();
-  fillEmptyBuffer(ebuf, message);
-  conn->addBufToWriteBuffer(ebuf);
+  if (fillEmptyBuffer(ebuf, message) < 0)
+  {
+    LOG(ERROR) << "send error:"<<evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR());
+  }
+  if (conn->addBufToWriteBuffer(ebuf) != 0)
+  {
+    LOG(ERROR) << "send error:"<<evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR());
+  }
   evbuffer_free(ebuf);
 }
 
-void ProtobufCodecLite::fillEmptyBuffer(struct evbuffer* buf,
+int ProtobufCodecLite::fillEmptyBuffer(struct evbuffer* buf,
                                         const google::protobuf::Message& message)
 {
-  evbuffer_add(buf, tag_.c_str(), tag_.size());
+  int res = 0;
+  if ((res = evbuffer_add(buf, tag_.c_str(), tag_.size())) < 0)
+    return res;
 
   int byte_size = serializeToBuffer(message, buf);
 
   int32_t checkSum = checksum(buf, byte_size+tag_.size());
   int32_t len = sockets::hostToNetwork32(checkSum);
-  evbuffer_add(buf, &len, sizeof len);
+  if ((res = evbuffer_add(buf, &len, sizeof len)) < 0)
+    return res;
   //  assert(buf->readableBytes() == tag_.size() + byte_size + kChecksumLen);
   len = sockets::hostToNetwork32(static_cast<int32_t>(tag_.size() + byte_size + kChecksumLen));
-  evbuffer_prepend(buf, &len, sizeof len);
+  if( (res = evbuffer_prepend(buf, &len, sizeof len)) < 0)
+    return res;
+  return 0;
 }
 
 
@@ -72,12 +84,13 @@ int ProtobufCodecLite::serializeToBuffer(const google::protobuf::Message& messag
 
 void ProtobufCodecLite::onMessage(Conn* conn)
 {
+  LOG(INFO) << "received message len:"<<conn->getReadBufferLen();
   while (conn->getReadBufferLen() >= static_cast<uint32_t>(kMinMessageLen+kHeaderLen))
   {
     int32_t len = 0;
     conn->readBuffer(reinterpret_cast<char *>(&len), sizeof(len));
     len = asInt32(reinterpret_cast<char *>(&len));
-    if (len > kMaxMessageLen || len < kMinMessageLen)
+    if (len > kMaxMessageLen || (uint32_t)len < kMinMessageLen)
     {
       errorCallback_(conn, kInvalidLength);/*change*/
       break;
@@ -154,8 +167,8 @@ void ProtobufCodecLite::defaultErrorCallback(Conn* conn,
   //LOG(DEBUF)<< "ProtobufCodecLite::defaultErrorCallback - " << errorCodeToString(errorCode);
   if (conn)
   {
-    conn->getThread()->connect_queue.deleteConn(conn);
     bufferevent_free(conn->getBufferevent());
+    conn->getThread()->connect_queue.deleteConn(conn);
   }
 }
 
@@ -168,15 +181,18 @@ int32_t ProtobufCodecLite::asInt32(const char* buf)
 
 int32_t ProtobufCodecLite::checksum(struct evbuffer* buf, int len)
 {
+  int dlen = 0;
   uLong adler = adler32(1L, Z_NULL, 0);
   int n = evbuffer_peek(buf, len, NULL, NULL, 0);
   evbuffer_iovec *vec = new evbuffer_iovec[n];
   int res = evbuffer_peek(buf, len, NULL, vec, n);
   assert( res == n);
   for (int i = 0; i < n; i++){
+    dlen += vec[i].iov_len;
     adler = adler32(adler, static_cast<const Bytef*>(vec[i].iov_base), vec[i].iov_len);
   }
   delete [] vec;
+//  LOG(INFO) << "Len : "<< dlen << "checksum : "<<adler;
 
   return static_cast<int32_t>(adler);
 }
@@ -186,7 +202,9 @@ bool ProtobufCodecLite::validateChecksum(const Bytef* buf, int len)
   int32_t expectedCheckSum = asInt32(reinterpret_cast<const char *>(buf) + len - kChecksumLen);
   uLong adler = adler32(1L, Z_NULL, 0);
   adler = adler32(adler, (buf), len-kChecksumLen);
-  return adler == static_cast<uLong>(expectedCheckSum);
+//  LOG(INFO) << "Len : "<< len-kChecksumLen << "checksum : "<<adler;
+
+  return (static_cast<int32_t>(adler)) == (expectedCheckSum);
 }
 
 ProtobufCodecLite::ErrorCode ProtobufCodecLite::parse(Conn* conn,
@@ -205,7 +223,7 @@ ProtobufCodecLite::ErrorCode ProtobufCodecLite::parse(Conn* conn,
   res = evbuffer_peek(readBuffer, len, NULL, &vec, 1);
   assert( res == 1);
 */
-  if (validateChecksum(static_cast<const Bytef*>(data+tag_.size()), len-tag_.size()))
+  if (validateChecksum(static_cast<const Bytef*>(data), len))
   {
     if (memcmp(data, tag_.data(), tag_.size()) == 0)
     {

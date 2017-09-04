@@ -10,7 +10,8 @@ TcpServer::TcpServer(int count, const std::string& ip,int port)
   main_base_->thread_id = pthread_self();
   main_base_->base = event_base_new();
   if (!main_base_->base)
-    throw EkvNetErr("main thread event_base_new error!");
+    throw EkvNetErr(std::string("main thread event_base_new error:").append(
+                      evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())));
 
   for(int i=0;i< thread_count_;i++)
   {
@@ -35,17 +36,19 @@ void TcpServer::setupThread(LibeventThread* thread)
   thread->tcp_server = this;
   thread->base = event_base_new();
   if(!thread->base)
-    throw EkvNetErr("child thread event_base_new error!");
+    throw EkvNetErr(std::string("child thread event_base_new error:").append(
+                      evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())));
   int fds[2];
   if(pipe(fds))
-    throw EkvNetErr("child thread pipe create error!");
+    throw EkvNetErr(std::string("child thread pipe create error:").append(strerror(errno)));
   thread->notify_send_fd = fds[1];
   thread->notify_recv_fd = fds[0];
 
   event_set(&thread->notify_event,thread->notify_recv_fd,EV_READ|EV_PERSIST,notifyHandler,thread);
   event_base_set(thread->base,&thread->notify_event);
   if(event_add(&thread->notify_event,0) == -1)
-    throw EkvNetErr("child thread add event error!");
+    throw EkvNetErr(std::string("child thread add event error:").append(
+                      evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR())));
 }
 
 void TcpServer::notifyHandler(int fd, short which,void* arg)
@@ -56,7 +59,7 @@ void TcpServer::notifyHandler(int fd, short which,void* arg)
   evutil_socket_t confd;
   if(-1 == read(pipefd,&confd,sizeof(evutil_socket_t)))
   {
-    LOG(ERROR)<<"pipe read error";
+    LOG(ERROR)<<"pipe read error:"<<strerror(errno);
     return ;
   }
   if(EXIT_CODE == confd)
@@ -70,8 +73,9 @@ void TcpServer::notifyHandler(int fd, short which,void* arg)
   bev = bufferevent_socket_new(thread->base,confd,BEV_OPT_CLOSE_ON_FREE);
   if(!bev)
   {
-    LOG(ERROR)<<"bufferevent create with evutil_socket_t  error";
-    event_base_loopbreak(thread->base);
+    LOG(ERROR)<<"bufferevent create with evutil_socket_t  error:" <<
+                evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR());
+//    event_base_loopbreak(thread->base);
     return;
   }
 
@@ -155,12 +159,12 @@ void TcpServer::startRun()
   if(ip_ != std::string())
   {
     if(inet_pton(AF_INET,ip_.c_str(),&sin.sin_addr) <= 0)
-      throw EkvNetErr("sokcet ip error!");
+      throw EkvNetErr(std::string("sokcet ip error:").append(strerror(errno)));
   }
 
   listener = evconnlistener_new_bind(main_base_->base,acceptCb,(void*)this,LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE,-1,(sockaddr*)&sin,sizeof(sockaddr_in));
   if(NULL == listener)
-    throw EkvNetErr("create listener error!");
+    throw EkvNetErr(std::string("create listener error:").append(strerror(errno)));
 
   for(int i=0;i<thread_count_;i++)
   {
