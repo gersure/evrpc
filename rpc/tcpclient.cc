@@ -121,6 +121,7 @@ void TcpClient::startRun()
 
 void TcpClient::quit(timeval *tv)
 {
+  bufferevent_free(conn_.bev_);
   event_base_loopexit(main_base_.base,tv);
 }
 
